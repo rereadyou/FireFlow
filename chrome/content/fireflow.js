@@ -1,0 +1,493 @@
+FBL.ns(function() { with (FBL) {
+    // ************************************************************************************************
+    // Constants
+
+    const Cc = Components.classes;
+    const Ci = Components.interfaces;
+    const jsdICallHook = Ci.jsdICallHook;
+
+    // Register string bundle for $STR method
+    Firebug.registerStringBundle("chrome://fireflow/locale/fireflow.properties");
+
+    function FFlowPanel() {}
+    FFlowPanel.prototype = extend(Firebug.Panel,
+                                  {
+                                      name:"fFlow",
+                                      title: "FlowTrace",
+                                      searchable:true,
+                                      initialize: function(context, doc)
+                                      {
+                                          Firebug.Panel.initialize.apply(this, arguments);
+                                          appendStylesheet(doc, "chrome://fireflow/skin/classic/fireflow.css");
+                                      },
+
+                                      show: function(state)
+                                      {
+                                          Firebug.Panel.show.apply(this, arguments);
+
+                                          this.showToolbarButtons("fbFlowButtons", true);
+
+                                          this.refresh();
+                                      },
+
+                                      hide: function()
+                                      {
+                                          Firebug.Panel.hide.apply(this, arguments);
+
+                                          this.showToolbarButtons("fbFlowButtons", false);
+                                      },
+                                      search: function(text, reverse) {
+                                          // incremental search, get the row and highlight it, return true for match false otherwise
+                                          if (!text)
+                                          {
+                                              delete this.currentSearch;
+                                              this._highlightRow(null);
+                                              return false;
+                                          }
+
+                                          var row;
+                                          if (this.currentSearch && text == this.currentSearch.text) {
+                                              row = this.currentSearch.findNext(true, undefined, reverse, Firebug.Search.isCaseSensitive(text));
+
+                                          } else {
+                                              function findRow(node) { return getAncestorByClass(node, "memberRow"); }
+                                              this.currentSearch = new TextSearch(this.panelNode, findRow);
+                                              row = this.currentSearch.find(text, reverse, Firebug.Search.isCaseSensitive(text))
+                                          }
+                                          if (row) {
+                                              this._highlightRow(row);
+                                              return true;
+                                          } else {
+                                              return false;
+                                          }
+
+                                      },
+                                      _highlightRow: function(row)
+                                      {
+                                          if (this.highlightedRow)
+                                              cancelClassTimed(this.highlightedRow, "jumpHighlight", this.context);
+
+                                          this.highlightedRow = row;
+
+                                          if (row)
+                                              setClassTimed(row, "jumpHighlight", this.context);
+                                      },
+                                      getOptionsMenuItems: function()
+                                      {
+                                          return [
+                                              {label: "Help", command: bindFixed(this._openHelpLink, this, true) }
+                                          ];
+                                      },
+                                      _openHelpLink: function() 
+                                      {
+                                          var url ="http://blog.imaginea.com/fireflow/";
+										  this.openLink(url);
+										  
+                                      },
+									  
+									  /**
+									   * Get a handle to a service.
+									   * @param {string} className The class name.
+									   * @param {string} interfaceName The interface name.
+									   */
+									  CCSV: function(className, interfaceName) {
+										var classObj = Cc[className];
+										var ifaceObj = Ci[interfaceName];
+										if (!classObj || !ifaceObj) {
+										  return null;
+										}
+										return classObj.getService(ifaceObj);
+									  },
+
+									  /**
+									   * Get the browser preferences object.
+									   */
+									  getPrefs: function() {
+										return this.CCSV(
+											'@mozilla.org/preferences-service;1', 'nsIPrefBranch');
+									  },
+
+									   /**
+									   * Check if an integer preference is set.  If so, return its value.
+									   * If not, return the default value passed as an argument.
+									   * @param {string} prefName The name of the preference to fetch.
+									   * @param {number} defaultValue The default value to use if the
+									   *     pref is undefined or not a number.
+									   * @return {number} The preference value.
+									   */
+									  getIntPref: function(prefName, defaultValue) {
+										var prefs = this.getPrefs();
+										if (prefs.getPrefType(prefName) == prefs.PREF_INT) {
+										  return prefs.getIntPref(prefName);
+										} else {
+										  return defaultValue;
+										}
+									  },
+									  /**
+									   * Open the given link, respecting the user's pref to open in a tab
+									   * vs a new window.
+									   * @param {string} url The url to open.
+									   */
+
+									  openLink: function(url) {
+										if (this.getIntPref('browser.link.open_newwindow', 3) == 3) {
+											gBrowser.selectedTab = gBrowser.addTab(url);
+										} else {
+										  FirebugChrome.window.open(url, '_blank');
+										}
+									  }
+
+                                  });
+    function FFlowModule() {}
+    Firebug.FFlowModule = extend(Firebug.Module,
+                                 /** @lends Firebug.FTraceModule */
+                                 {
+                                     initialize: function(prefDomain, prefNames)
+                                     {
+                                         if (Firebug.TraceModule && Firebug.TraceModule.addListener)
+                                             Firebug.TraceModule.addListener(this.TraceListener);
+
+                                         Firebug.Module.initialize.apply(this, arguments);
+
+                                         prefs.addObserver(Firebug.prefDomain, this, false);
+                                         this.jsd, this.fireFlowing;
+                                         this.started = false;
+                                     },
+
+                                     shutdown: function()
+                                     {
+                                         Firebug.Module.shutdown.apply(this, arguments);
+
+                                         prefs.removeObserver(Firebug.prefDomain, this, false);
+
+                                         if (Firebug.TraceModule && Firebug.TraceModule.removeListener)
+                                             Firebug.TraceModule.removeListener(this.TraceListener);
+                                     },
+
+                                     internationalizeUI: function(doc)
+                                     {
+                                         var elements = ["ftraceToggle"];
+                                         for (var i=0; i<elements.length; i++)
+                                         {
+                                             var element = $(elements[i], doc);
+                                             FBL.internationalize(element, "label");
+                                             FBL.internationalize(element, "tooltiptext");
+                                         }
+                                     },
+
+                                     refresh: function(context)
+                                     {
+                                         var panel = context.getPanel("ftrace", true);
+                                         if (panel)
+                                             panel.refresh();
+                                     },
+                                     // nsIPrefObserver
+                                     observe: function(subject, topic, data)
+                                     {
+                                         if (topic != "nsPref:changed")
+                                             return;
+                                         // TODO someday support the default path depth as preference
+
+                                     },
+                                     toggleTrackingPath: function(context)
+                                     {
+                                         // Error prone: so irrespective of how sure u r keep it in try catch
+                                         try{
+                                             if (this.jsd) {
+                                                 if(this.fireFlowing) {
+                                                     this.jsd.pause();
+                                                     while (this.jsd.pauseDepth > 0) {  // unwind completely
+                                                         this.jsd.unPause();
+                                                     }
+                                                     this.logMessage("Stopping the jsd debugger");
+                                                     this.jsd.functionHook = this.originalFunctionHook;
+                                                     //this.jsd.off();
+													 this.fireFlowing = false;
+                                                     this.showTree(context);
+                                                     this.logMessage("Stopped the jsd debugger");
+                                                 } else {
+                                                     this.startDebugger(context);
+                                                 }
+                                             } else {
+                                                 try{
+                                                     this.jsd = Cc["@mozilla.org/js/jsd/debugger-service;1"].getService(Ci.jsdIDebuggerService);
+                                                     this.startDebugger(context);
+                                                 } catch(e) {
+                                                     this.logError(e);
+                                                 }
+                                             }
+                                         }catch(e){
+                                             this.logError(e);
+                                         }
+
+                                     },
+                                     logMessage: function(message)
+                                     {
+                                         // TODO temporary code for logging, replace with FireTrace
+    	                                 if (Components) {
+    	                                     var consoleService = Cc["@mozilla.org/consoleservice;1"].getService(Ci.nsIConsoleService);
+    	                                     if (consoleService != null) {
+    	                                         consoleService.logStringMessage(message);
+    	                                     }
+    	                                 }
+                                     },
+                                     logError: function(error)
+                                     {
+                                         // TODO replace with FireTrace
+                                         this.logMessage(error);
+                                     },
+                                     startDebugger: function(context)
+                                     {
+                                         this.logMessage("Starting the async debugger");
+                                         this.rootNode = new FlowNode("flowtrack-root", "Fictitious File");
+                                         this.currentNode = this.rootNode;
+										 this.fireFlowing = true;
+
+                                         this._addFilters(this.jsd);
+                                         this._injectOnCallHook();
+                                         var self = this;
+                                         if (this.jsd.asyncOn) {
+                                             this.jsd.asyncOn({
+                                                 onDebuggerActivated: function()
+                                                 {
+                                                     self.logMessage("Started the async debugger");
+                                                 }
+                                             });
+                                         } else {
+                                             this.jsd.on();
+                                         }
+                                         this.showMessage(context);
+                                         this.logMessage("registered the function hook");
+                                     },
+                                     markReturn: function(self) {
+                                         if (self.currentNode && self.currentNode.parent) {
+                                             var lastSibling = self.currentNode.lastChild();
+                                             if (lastSibling && lastSibling.ignoreReturnCount > 0) {
+                                                 lastSibling.ignoreReturnCount--;
+                                             } else {
+                                                 self.currentNode = self.currentNode.parent;
+                                             }
+                                         }
+                                     },
+                                     markEntry: function(calledFunctionName, scriptName, lineNumber, self) {
+                                         if (self.currentNode) {
+                                             var lastSibling = self.currentNode.lastChild()
+                                             if (lastSibling && calledFunctionName == lastSibling.functionName && scriptName == lastSibling.scriptName) {
+                                                 lastSibling.invocationCount++;
+                                                 lastSibling.ignoreReturnCount++;
+                                             } else {
+                                                 // this.logMessage(scriptName +" "+ self.currentNode.scriptName+" "+ calledFunctionName+" "+ self.currentNode.functionName)
+
+                                                 var childNode = new FlowNode(calledFunctionName, scriptName);
+                                                 childNode.lineNumber = lineNumber;
+                                                 self.currentNode.addChild(childNode);
+                                                 self.currentNode = childNode;
+                                             }
+                                         }
+                                     },
+                                     showTree: function(context) {
+                                         try{
+                                             $("fFlowToggle").label="Start";
+
+                                             var panel = context.getPanel("fFlow", true);
+                                             if (panel) {
+                                                 if (this.rootNode) {
+                                                     FireFlowTemplate.tag.replace({node:this.rootNode}, panel.panelNode);
+                                                 } else {
+                                                     FireFlowTemplate.noResultTag.replace({}, panel.panelNode);
+                                                 }
+                                             }
+                                             this.rootNode = null;
+                                             this.currentNode = null;
+                                         }catch(e) {
+                                             this.logError(e);
+                                         }
+
+                                     },
+                                     showMessage: function(context) {
+                                         $("fFlowToggle").label="Stop";
+                                         var panel = context.getPanel("fFlow", true);
+                                         if (panel) {
+                                             FireFlowTemplate.simpleMessageTag.replace({}, panel.panelNode);
+                                         }
+                                     },
+                                     _createDummyPath: function() {
+                                         // for quick ui testing can use this dummy tree
+                                         this.rootNode = null;
+                                         this.currentNode = null;
+                                         this.markEntry("foo",1, this);
+                                         this.markEntry("bar",2, this);
+                                         this.markReturn(this);
+                                         this.markEntry("foobar",3, this);
+                                         this.markReturn(this);
+                                         this.markReturn(this);
+                                     },
+                                     _injectOnCallHook: function() {
+                                         this.originalFunctionHook = this.jsd.functionHook;
+                                         var self = this;
+                                         
+                                         var loggingHook = {
+                                             onCall: function(frame, type) {
+                                                 try{
+                                                     if (frame && frame.functionName && frame.script) {
+                                                         var calledFunctionName = frame.functionName  ;    
+                                                         var scriptName = frame.script.fileName;
+                                                         if ((calledFunctionName && calledFunctionName === 'anonymous') || (scriptName && scriptName.match("min.js$"))) {
+                                                             return;
+                                                         }
+
+                                                         if ((scriptName.indexOf("chrome:") == -1 && scriptName.indexOf("resource:") == -1) && calledFunctionName[0] != '$' && !frame.isDebugger) {
+                                                             switch(type)  { 
+                                                             case jsdICallHook.TYPE_TOPLEVEL_END: 
+                                                                 
+                                                                 self.markReturn(self);
+                                                                 break;
+                                                             case jsdICallHook.TYPE_TOPLEVEL_START:  
+                                                                 
+                                                                 self.markEntry(calledFunctionName,scriptName, frame.line, self);  
+                                                                 break;  
+
+                                                             case jsdICallHook.TYPE_FUNCTION_RETURN: 
+                                                                 self.markReturn(self);
+                                                                 break;
+                                                             case jsdICallHook.TYPE_FUNCTION_CALL:  
+                                                                 self.markEntry(calledFunctionName,scriptName, frame.line, self);  
+                                                                 break;  
+                                                                 
+                                                             }   
+                                                         }
+                                                     }
+
+                                                 }catch(e) {
+                                                     self.logMessage(e);
+                                                 }
+                                             }
+                                         };
+                                          this.jsd.functionHook = loggingHook;
+                                          this.jsd.topLevelHook = loggingHook;
+                                     },
+                                     _addFilters: function(jsd) {
+                                         // AN: If we ever wanna support chromebug, this needs to change
+                                         jsd.appendFilter(this._createFilter("*/firefox/components/*"));
+                                         jsd.appendFilter(this._createFilter("*/firefox/modules/*"));
+                                         jsd.appendFilter(this._createFilter("XStringBundle"));
+                                         jsd.appendFilter(this._createFilter("chrome://*"));
+                                         jsd.appendFilter(this._createFilter("x-jsd:ppbuffer*"));
+                                         jsd.appendFilter(this._createFilter("XPCSafeJSObjectWrapper.cpp"));
+                                     },
+                                     _createFilter: function(pattern, pass, startLine, endLine) {
+                                         var jsdIFilter = Ci.jsdIFilter;
+                                         var filter = {
+                                             globalObject: null,
+                                             flags: pass ? (jsdIFilter.FLAG_ENABLED | jsdIFilter.FLAG_PASS) : jsdIFilter.FLAG_ENABLED,
+                                             urlPattern: pattern,
+                                             startLine: 0,
+                                             endLine: 0
+                                         };
+                                         return filter;
+                                     }
+                                 });
+    // Template used for actual flow data, shows a div with more inner divs
+    var FireFlowTemplate = domplate(
+        {
+            simpleMessageTag:
+            SPAN({"class":"message"},"Press Stop to see flow"),
+
+            noResultTag:
+            SPAN({"class":"message"},"No Results to show"),
+
+            tag:
+            TAG("$graphNode", {node:"$node"}),
+
+            graphNode:
+            TABLE({"class": "flowInfoTable", cellpadding: 0, cellspacing: 0},
+                  TBODY({"class": "flowInfoTBody"},
+                        TR(
+                            TD(
+                                TAG("$graphElement", {node:"$node"})
+                            )
+                        )
+                       )
+                 ),
+            graphElement:
+            DIV({"class": "nodeBox memberLabel memberRow opened", $hasChildren:"$node.childIndicator"},
+                SPAN({"class":"memberLabelCell"},
+                     SPAN({"class":"nodeBox memberLabel", onclick: "$toggleState"},
+                          SPAN({"class":"functionName messageNameLabel "}, "$node.functionName")
+                         )
+                    ),
+                A({"class":"scriptName nodeBox", _scriptName:"$node.scriptName", _lineNumber:"$node.lineNumber", onclick:"$goToSourceLink"},"$node.scriptName"),
+                SPAN({"class":"lineNumber nodeBox"},"$node.lineNumber"),
+                SPAN({"class":"scriptCount nodeBox"},"$node.invocationCount"),
+                DIV({"class":"childList"},
+                    FOR("child", "$node.children",
+                        TAG("$graphElement", {node:"$child"})
+                       )
+                        )
+               ),
+			goToSourceLink: function(event){
+				var target = event.target;
+				var sourceLink = new SourceLink(target.scriptName, target.lineNumber, "js");
+				Firebug.chrome.select(sourceLink);
+			},
+            toggleState: function(event) {
+                var eventTarget = event.target;
+                if (hasClass(eventTarget, "messageNameLabel")) {
+                    //TODO add section to navigate to actual file
+                    return;
+                } else {
+                    var row = getAncestorByClass(getAncestorByClass(eventTarget, "memberLabelCell"),"memberRow" );
+                    //toggle state
+                    if (row) {
+                        if (hasClass(row, "opened")) {
+                            removeClass(row, "opened");
+                            row.lastChild.style.display = "none";
+                        } else {
+                            setClass(row, "opened");
+                            row.lastChild.style.display = "block";
+                        }
+                    }
+                }
+            },
+        }
+    );
+
+    function FlowNode(functionName, scriptName) {
+        this.functionName = functionName;
+        this.scriptName = scriptName;
+        this.lineNumber = 0;
+        this.invocationCount = 1;
+        this.ignoreReturnCount = 0;
+        this.parent = null;
+        this.children = new Array();
+        this.childIndicator = "";
+    }
+
+
+    FlowNode.prototype.addChild = function(node) {
+        this.children.push(node);
+        node.setParent(this);
+        this.childIndicator = true;
+    };
+
+    FlowNode.prototype.setParent = function(node) {
+        this.parent = node;
+    };
+
+    FlowNode.prototype.toString = function() {
+        return "[ "+this.functionName+" , childList ["+this.children+"]]";
+    };
+
+    FlowNode.prototype.hasChildren = function() {
+        return (this.children.length > 0);
+    };
+    
+    FlowNode.prototype.lastChild = function() {
+        if (this.hasChildren()) {
+            return this.children[this.children.length - 1];
+        }
+    }
+    Firebug.registerPanel(FFlowPanel);
+    Firebug.registerModule(Firebug.FFlowModule);
+
+}});

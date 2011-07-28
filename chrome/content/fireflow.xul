@@ -1,0 +1,22 @@
+<?xml version="1.0"?> 
+<?xml-stylesheet href="chrome://fireflow/skin/fireflow.css"?>
+<overlay xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+
+  <script src="chrome://fireflow/content/fireflow.js" type="application/x-javascript"/>
+
+  <commandset id="mainCommandSet">
+    <command id="cmd_ftoggleFlow" oncommand="Firebug.FFlowModule.toggleTrackingPath(Firebug.currentContext)"/>
+  </commandset> 
+
+  <toolbar id="fbToolbar" align="center" >
+    <hbox id="fbToolbarInner" flex="1" align="center">
+      <hbox id="fbFlowButtons" insertafter="fbNetButtons" collapsed="true">
+        <toolbarbutton id="fFlowToggle" label="Start"
+                       class="toolbar-text-button"
+                       tooltiptext="ftFlowTooltip.startTrackingPathTooltip"
+                       command="cmd_ftoggleFlow" />
+      </hbox>
+    </hbox>
+  </toolbar>
+
+</overlay>

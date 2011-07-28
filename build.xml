@@ -1,0 +1,26 @@
+<project name="fireflow" default="make-xpi-dev">
+	<property name="base.dir" value="."/>
+	<property name="staging.dir" value="${base.dir}/../staging"/>
+	<property name="xpi.name" value="fireflow@imaginea.xpi"/>
+
+    <target name="make-xpi" depends="clean" description="Builds the xpi">
+    	<jar jarfile="${staging.dir}/${xpi.name}">
+            <fileset dir="${base.dir}">
+                <include name="**/*.*"/>
+            </fileset>
+    	</jar>
+    </target>
+    <target name="make-xpi-dev" depends="clean" description="Builds the xpi">
+      <property name="xpi.dir" value="${staging.dir}/xpi"/>
+    	<copy todir="${xpi.dir}">
+            <fileset dir="${base.dir}">
+                <include name="**/*.*"/>
+                <exclude name="${staging.dir}/*" />
+            </fileset>
+    	</copy>
+    </target>
+    <target name="clean" description="Deletes the old xpi">
+      <delete file="${staging.dir}/${xpi.name}" />
+      <mkdir dir="${staging.dir}" />
+    </target>
+</project>

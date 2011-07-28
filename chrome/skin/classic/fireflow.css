@@ -1,0 +1,14 @@
+.functionName
+.scriptName {
+    font-family: Lucida Grande, sans-serif;
+    font-weight: bold;
+    color: DarkGreen;
+    white-space: pre-wrap;
+    padding-right: 15px;
+}
+
+.objectPropValue {
+    font-weight: normal;
+    font-style: italic;
+    color: #555555;
+}

@@ -1,0 +1,30 @@
+A simple trace utility to reverse engineer js code flows. Coded as a firebug extension.
+
+Demo at http://www.youtube.com/embed/42nR1GpzYp8
+
+How to use
+To reverse engineer a action, follow these simple steps
+1. Open Firebug, navigate to “FlowTrace”
+2. Press Start in the extension menu bar
+3. Perform the actual action on the actual page.
+4. Press Stop once you see the result of the action
+
+A trace of all js functions invoked during this time would be displayed. 
+The trace contains information about the script source, the line number and number of invocations. 
+All the nodes in the trace are linked to their actual source.
+
+How it works
+
+This plugin hooks into the firefox debugging framework and registers for method callbacks. 
+Each method call is thus recorded and then represented in this tree format. 
+The current version excludes all anonymous functions and all functions coming from *-min.js sources.
+
+Difference between this and profiling
+
+While profiling is about getting a list of all invocations irrespective of the order, 
+this tool gives a in-order execution chain.
+
+Future Work
+1. Instead of using arbitrary filters, am planning to work on exposing include and exclude rules to the end user. 
+Feel free to request any features or enhance it.
+

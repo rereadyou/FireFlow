@@ -1,0 +1,4 @@
+content		fireflow		chrome/content/
+skin    fireflow   classic/1.0 chrome/skin/classic/
+locale  fireflow    en-US           chrome/locale/en-US/
+overlay		chrome://firebug/content/firebugOverlay.xul  		chrome://fireflow/content/fireflow.xul
