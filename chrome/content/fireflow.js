@@ -223,23 +223,23 @@ FBL.ns(function() { with (FBL) {
                                      },
                                      logMessage: function(message)
                                      {
-                                         // TODO temporary code for logging, replace with FireTrace
-    	                                 if (Components) {
-    	                                     var consoleService = Cc["@mozilla.org/consoleservice;1"].getService(Ci.nsIConsoleService);
-    	                                     if (consoleService != null) {
-    	                                         consoleService.logStringMessage(message);
-    	                                     }
-    	                                 }
+                                         // At times error console is a easier place to look at logs
+    	                                 // if (Components) {
+    	                                 //     var consoleService = Cc["@mozilla.org/consoleservice;1"].getService(Ci.nsIConsoleService);
+    	                                 //     if (consoleService != null) {
+    	                                 //         consoleService.logStringMessage(message);
+    	                                 //     }
+    	                                 // }
+                                         FBTrace.sysout(message);
                                      },
                                      logError: function(error)
                                      {
-                                         // TODO replace with FireTrace
                                          this.logMessage(error);
                                      },
                                      startDebugger: function(context)
                                      {
                                          this.logMessage("Starting the async debugger");
-                                         this.rootNode = new FlowNode("flowtrack-root", "Fictitious File");
+                                         this.rootNode = new FlowNode("trace-root", "Trace Root");
                                          this.currentNode = this.rootNode;
 										 this.fireFlowing = true;
 
@@ -276,8 +276,6 @@ FBL.ns(function() { with (FBL) {
                                                  lastSibling.invocationCount++;
                                                  lastSibling.ignoreReturnCount++;
                                              } else {
-                                                 // this.logMessage(scriptName +" "+ self.currentNode.scriptName+" "+ calledFunctionName+" "+ self.currentNode.functionName)
-
                                                  var childNode = new FlowNode(calledFunctionName, scriptName);
                                                  childNode.lineNumber = lineNumber;
                                                  self.currentNode.addChild(childNode);
@@ -293,6 +291,7 @@ FBL.ns(function() { with (FBL) {
                                              if (panel) {
                                                  if (this.rootNode) {
                                                      FireFlowTemplate.tag.replace({node:this.rootNode}, panel.panelNode);
+                                                     this._decorateTemplate(panel.panelNode);
                                                  } else {
                                                      FireFlowTemplate.noResultTag.replace({}, panel.panelNode);
                                                  }
@@ -303,6 +302,30 @@ FBL.ns(function() { with (FBL) {
                                              this.logError(e);
                                          }
 
+                                     },
+                                     // AMO review does not click onclick, so decorate this separately
+                                     _decorateTemplate: function(panelNode) {
+                                         var i = 0;
+                                         var scriptLinks = panelNode.getElementsByClassName('scriptLink');
+                                         if (scriptLinks) {
+                                             // yes forEach is the way to go, but guess what that works only in 1.6
+                                             for (; i < scriptLinks.length; i++) {
+                                                 scriptLinks[i].addEventListener('click', this._openSource, false);
+                                             }
+                                         }
+                                         var treeNodes = panelNode.getElementsByClassName('treeNode');
+                                         this.logMessage(treeNodes);
+                                         if (treeNodes) {
+                                             for (i = 0; i < treeNodes.length; i++) {
+                                                 treeNodes[i].addEventListener('click', FireFlowTemplate.toggleState, false);
+                                             }
+                                         }
+
+                                     },
+                                     _openSource: function(event) {
+				                         var target = event.target;
+				                         var sourceLink = new SourceLink(target.scriptName, target.lineNumber, "js");
+				                         Firebug.chrome.select(sourceLink);
                                      },
                                      showMessage: function(context) {
                                          $("fFlowToggle").label="Stop";
@@ -412,43 +435,39 @@ FBL.ns(function() { with (FBL) {
             graphElement:
             DIV({"class": "nodeBox memberLabel memberRow opened", $hasChildren:"$node.childIndicator"},
                 SPAN({"class":"memberLabelCell"},
-                     SPAN({"class":"nodeBox memberLabel", onclick: "$toggleState"},
-                          SPAN({"class":"functionName messageNameLabel "}, "$node.functionName")
+                     SPAN({"class":"nodeBox memberLabel treeNode"},
+                          SPAN({"class":"functionName messageNameLabel "}, "$node.functionName()   ")
                          )
                     ),
-                A({"class":"scriptName nodeBox", _scriptName:"$node.scriptName", _lineNumber:"$node.lineNumber", onclick:"$goToSourceLink"},"$node.scriptName"),
-                SPAN({"class":"lineNumber nodeBox"},"$node.lineNumber"),
-                SPAN({"class":"scriptCount nodeBox"},"$node.invocationCount"),
+                A({"class":"scriptName scriptLink", _scriptName:"$node.scriptName", _lineNumber:"$node.lineNumber"},"$node.prettyName"), 
+                SPAN({"class":"lineNumber"},"($node.lineNumber)"),
+                SPAN({"class":"scriptCount nodeBox"},"[Invoked $node.invocationCount times]"),
                 DIV({"class":"childList"},
                     FOR("child", "$node.children",
                         TAG("$graphElement", {node:"$child"})
                        )
                         )
                ),
-			goToSourceLink: function(event){
-				var target = event.target;
-				var sourceLink = new SourceLink(target.scriptName, target.lineNumber, "js");
-				Firebug.chrome.select(sourceLink);
-			},
             toggleState: function(event) {
                 var eventTarget = event.target;
+                var row = null;
                 if (hasClass(eventTarget, "messageNameLabel")) {
-                    //TODO add section to navigate to actual file
-                    return;
+                    row = getAncestorByClass(getAncestorByClass(getAncestorByClass(eventTarget,"memberLabel"), "memberLabelCell"),"memberRow" );
                 } else {
-                    var row = getAncestorByClass(getAncestorByClass(eventTarget, "memberLabelCell"),"memberRow" );
-                    //toggle state
-                    if (row) {
-                        if (hasClass(row, "opened")) {
-                            removeClass(row, "opened");
-                            row.lastChild.style.display = "none";
-                        } else {
-                            setClass(row, "opened");
-                            row.lastChild.style.display = "block";
-                        }
+                    row = getAncestorByClass(getAncestorByClass(eventTarget, "memberLabelCell"),"memberRow" );
+                }
+                //toggle state
+                if (row) {
+                    if (hasClass(row, "opened")) {
+                        removeClass(row, "opened");
+                        row.lastChild.style.display = "none";
+                    } else {
+                        setClass(row, "opened");
+                        row.lastChild.style.display = "block";
                     }
                 }
-            },
+
+            }
         }
     );
 
@@ -461,6 +480,7 @@ FBL.ns(function() { with (FBL) {
         this.parent = null;
         this.children = new Array();
         this.childIndicator = "";
+        this.prettyName = scriptName;
     }
 
 
