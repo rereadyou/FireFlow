@@ -11,10 +11,14 @@ FBL.ns(function() { with (FBL) {
 
     function FFlowPanel() {}
     FFlowPanel.prototype = extend(Firebug.Panel,
+                                  /** @lends FFlowPanel */
                                   {
                                       name:"fFlow",
-                                      title: "FlowTrace",
+                                      parentPanel: "script",
+                                      title: "FireFlow",
                                       searchable:true,
+                                      enableAlly: true,
+
                                       initialize: function(context, doc)
                                       {
                                           Firebug.Panel.initialize.apply(this, arguments);
@@ -24,17 +28,12 @@ FBL.ns(function() { with (FBL) {
                                       show: function(state)
                                       {
                                           Firebug.Panel.show.apply(this, arguments);
-
-                                          this.showToolbarButtons("fbFlowButtons", true);
-
                                           this.refresh();
                                       },
 
                                       hide: function()
                                       {
                                           Firebug.Panel.hide.apply(this, arguments);
-
-                                          this.showToolbarButtons("fbFlowButtons", false);
                                       },
                                       search: function(text, reverse) {
                                           // incremental search, get the row and highlight it, return true for match false otherwise
@@ -75,7 +74,11 @@ FBL.ns(function() { with (FBL) {
                                       getOptionsMenuItems: function()
                                       {
                                           return [
-                                              {label: "Help", command: bindFixed(this._openHelpLink, this, true) }
+                                              {label: "Help", command: bindFixed(this._openHelpLink, this, true) },
+                                              {label: "Start", command: bindFixed(this._toggleTracking, this, true) },
+                                              {label: "Stop", command: bindFixed(this._toggleTracking, this, true) },
+                                              {label: "Clear", command: bindFixed(this._clearPanel, this, true) },
+
                                           ];
                                       },
                                       _openHelpLink: function() 
@@ -84,7 +87,14 @@ FBL.ns(function() { with (FBL) {
 										  this.openLink(url);
 										  
                                       },
-									  
+                                      _toggleTracking: function()
+                                      {
+                                          Firebug.FFlowModule.toggleTrackingPath(this.context);
+                                      },
+									  _clearPanel: function()
+                                      {
+                                          FireFlowTemplate.clearMessageTag.replace({}, this.panelNode);
+                                      },
 									  /**
 									   * Get a handle to a service.
 									   * @param {string} className The class name.
@@ -140,7 +150,6 @@ FBL.ns(function() { with (FBL) {
                                   });
     function FFlowModule() {}
     Firebug.FFlowModule = extend(Firebug.Module,
-                                 /** @lends Firebug.FTraceModule */
                                  {
                                      initialize: function(prefDomain, prefNames)
                                      {
@@ -152,6 +161,7 @@ FBL.ns(function() { with (FBL) {
                                          prefs.addObserver(Firebug.prefDomain, this, false);
                                          this.jsd, this.fireFlowing;
                                          this.started = false;
+                                         this.developmentRun = true;
                                      },
 
                                      shutdown: function()
@@ -224,13 +234,16 @@ FBL.ns(function() { with (FBL) {
                                      logMessage: function(message)
                                      {
                                          // At times error console is a easier place to look at logs
-    	                                 // if (Components) {
-    	                                 //     var consoleService = Cc["@mozilla.org/consoleservice;1"].getService(Ci.nsIConsoleService);
-    	                                 //     if (consoleService != null) {
-    	                                 //         consoleService.logStringMessage(message);
-    	                                 //     }
-    	                                 // }
-                                         FBTrace.sysout(message);
+                                         if (this.developmentRun) {
+    	                                     if (Components) {
+    	                                         var consoleService = Cc["@mozilla.org/consoleservice;1"].getService(Ci.nsIConsoleService);
+    	                                         if (consoleService != null) {
+    	                                             consoleService.logStringMessage(message);
+    	                                         }
+    	                                     }
+                                         } else {
+                                             FBTrace.sysout(message);
+                                         }
                                      },
                                      logError: function(error)
                                      {
@@ -285,7 +298,7 @@ FBL.ns(function() { with (FBL) {
                                      },
                                      showTree: function(context) {
                                          try{
-                                             $("fFlowToggle").label="Start";
+                                             //$("fFlowToggle").label="Start";
 
                                              var panel = context.getPanel("fFlow", true);
                                              if (panel) {
@@ -303,7 +316,7 @@ FBL.ns(function() { with (FBL) {
                                          }
 
                                      },
-                                     // AMO review does not click onclick, so decorate this separately
+                                     // AMO review does not dig onclick, so decorate this separately
                                      _decorateTemplate: function(panelNode) {
                                          var i = 0;
                                          var scriptLinks = panelNode.getElementsByClassName('scriptLink');
@@ -328,7 +341,7 @@ FBL.ns(function() { with (FBL) {
 				                         Firebug.chrome.select(sourceLink);
                                      },
                                      showMessage: function(context) {
-                                         $("fFlowToggle").label="Stop";
+                                         //$("fFlowToggle").label="Stop";
                                          var panel = context.getPanel("fFlow", true);
                                          if (panel) {
                                              FireFlowTemplate.simpleMessageTag.replace({}, panel.panelNode);
@@ -414,7 +427,10 @@ FBL.ns(function() { with (FBL) {
     var FireFlowTemplate = domplate(
         {
             simpleMessageTag:
-            SPAN({"class":"message"},"Press Stop to see flow"),
+            SPAN({"class":"message"},"Use the menu item Stop to see flow path"),
+
+            clearMessageTag:
+            SPAN({"class":"message"},"Use the menu item Start to start flow tracking"),
 
             noResultTag:
             SPAN({"class":"message"},"No Results to show"),
