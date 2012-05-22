@@ -2,3 +2,5 @@
 <!ENTITY start.tooltip "Starts the tracking process">
 <!ENTITY clear.tooltip "Clears the tracking console">
 <!ENTITY clear.label "Clear">
+<!ENTITY show.label "Show in Script Panel">
+<!ENTITY show.tooltip "Show the tracekd path in Script Panel">

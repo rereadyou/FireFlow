@@ -3,10 +3,12 @@
 <overlay xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
 
   <script src="chrome://fireflow/content/fireflow.js" type="application/x-javascript"/>
+  <script src="chrome://fireflow/content/fireflowscriptpanel.js" type="application/x-javascript"/>
 
   <commandset id="mainCommandSet">
     <command id="cmd_ftoggleFlow" oncommand="Firebug.FFlowModule.toggleTrackingPath(Firebug.currentContext)"/>
     <command id="cmd_fClear" oncommand="Firebug.FFlowModule.clearPanel(Firebug.currentContext)"/>
+    <command id="cmd_fShow" oncommand="Firebug.FFlowModule.showTreeInScriptPanel(Firebug.currentContext)"/>
   </commandset> 
 
   <toolbar id="fbToolbar" align="center" >
@@ -20,6 +22,10 @@
                        class="toolbar-text-button"
                        tooltiptext="&clear.tooltip;"
                        command="cmd_fClear" />
+        <toolbarbutton id="fFlowShow" label="&show.label;"
+                       class="toolbar-text-button"
+                       tooltiptext="&show.tooltip;"
+                       command="cmd_fShow" />
       </hbox>
     </hbox>
   </toolbar>

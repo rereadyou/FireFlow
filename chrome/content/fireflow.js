@@ -13,12 +13,12 @@ FBL.ns(function() { with (FBL) {
     FFlowPanel.prototype = extend(Firebug.Panel,
                                   {
                                       name:"fFlow",
-                                      title: "FlowTrace",
+                                      title: "FireFlow",
                                       searchable:true,
                                       initialize: function(context, doc)
                                       {
                                           Firebug.Panel.initialize.apply(this, arguments);
-                                          appendStylesheet(doc, "chrome://fireflow/skin/classic/fireflow.css");
+                                          appendStylesheet(doc, "rootcss", "chrome://fireflow/skin/fireflow.css");
                                       },
 
                                       show: function(state)
@@ -316,6 +316,21 @@ FBL.ns(function() { with (FBL) {
                                              this.logError(e);
                                          }
 
+                                     },
+                                     showTreeInScriptPanel:function(context) {
+                                         var panel = context.getPanel("fFlow", true);
+                                         var scriptPanel = context.getPanel("fFlowScriptPanel", true);
+                                         try{
+                                             if (scriptPanel) {
+                                                 scriptPanel.panelNode.innerHTML = panel.panelNode.innerHTML;
+                                                 this._decorateTemplate(scriptPanel.panelNode);
+                                                 this.logMessage("Passing html content to script panel");
+                                             } else {
+                                                 alert("Please enable the FireFlow panel under Script tab by selecting it and then perform this action again");
+                                             }
+                                         }catch(e) {
+                                             this.logError(e);
+                                         }
                                      },
                                      // AMO review does not dig onclick, so decorate this separately
                                      _decorateTemplate: function(panelNode) {
