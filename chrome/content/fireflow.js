@@ -152,6 +152,7 @@ FBL.ns(function() { with (FBL) {
                                          prefs.addObserver(Firebug.prefDomain, this, false);
                                          this.jsd, this.fireFlowing;
                                          this.started = false;
+                                         this.customFilters = [];
                                      },
 
                                      shutdown: function()
@@ -189,8 +190,14 @@ FBL.ns(function() { with (FBL) {
                                          // TODO someday support the default path depth as preference
 
                                      },
+                                     clearPanel: function(context) 
+                                     {
+                                         var panel = context.getPanel("fFlow", true);
+                                         FireFlowTemplate.clearMessageTag.replace({}, panel.panelNode);
+                                     },
                                      toggleTrackingPath: function(context)
                                      {
+                                         this.logMessage("About the toggle tracking path");
                                          // Error prone: so irrespective of how sure u r keep it in try catch
                                          try{
                                              if (this.jsd) {
@@ -224,12 +231,12 @@ FBL.ns(function() { with (FBL) {
                                      logMessage: function(message)
                                      {
                                          // At times error console is a easier place to look at logs
-    	                                 // if (Components) {
-    	                                 //     var consoleService = Cc["@mozilla.org/consoleservice;1"].getService(Ci.nsIConsoleService);
-    	                                 //     if (consoleService != null) {
-    	                                 //         consoleService.logStringMessage(message);
-    	                                 //     }
-    	                                 // }
+    	                                 if (Components) {
+    	                                     var consoleService = Cc["@mozilla.org/consoleservice;1"].getService(Ci.nsIConsoleService);
+    	                                     if (consoleService != null) {
+    	                                         consoleService.logStringMessage(message);
+    	                                     }
+    	                                 }
                                          FBTrace.sysout(message);
                                      },
                                      logError: function(error)
@@ -242,9 +249,16 @@ FBL.ns(function() { with (FBL) {
                                          this.rootNode = new FlowNode("trace-root", "Trace Root");
                                          this.currentNode = this.rootNode;
 										 this.fireFlowing = true;
-
-                                         this._addFilters(this.jsd);
+                                         if (! (this.filtersAdded )) {
+                                             this._addFilters(this.jsd);
+                                             this.filtersAdded = true;
+                                         }
+                                         if (!(this.customFilters)) {
+                                             this.customFilters = [];
+                                         }
+                                         this._addCustomFilters(this.jsd, this.customFilters);
                                          this._injectOnCallHook();
+
                                          var self = this;
                                          if (this.jsd.asyncOn) {
                                              this.jsd.asyncOn({
@@ -303,7 +317,7 @@ FBL.ns(function() { with (FBL) {
                                          }
 
                                      },
-                                     // AMO review does not click onclick, so decorate this separately
+                                     // AMO review does not dig onclick, so decorate this separately
                                      _decorateTemplate: function(panelNode) {
                                          var i = 0;
                                          var scriptLinks = panelNode.getElementsByClassName('scriptLink');
@@ -328,7 +342,10 @@ FBL.ns(function() { with (FBL) {
 				                         Firebug.chrome.select(sourceLink);
                                      },
                                      showMessage: function(context) {
-                                         $("fFlowToggle").label="Stop";
+                                         $("fFlowToggle").label=$STR("fireTrace.stopLabel");
+                                         // AN ToolTipText not working
+                                         $("fFlowToggle").tooltiptext=$STR("fireTrace.stopToolTip");
+
                                          var panel = context.getPanel("fFlow", true);
                                          if (panel) {
                                              FireFlowTemplate.simpleMessageTag.replace({}, panel.panelNode);
@@ -355,11 +372,11 @@ FBL.ns(function() { with (FBL) {
                                                      if (frame && frame.functionName && frame.script) {
                                                          var calledFunctionName = frame.functionName  ;    
                                                          var scriptName = frame.script.fileName;
-                                                         if ((calledFunctionName && calledFunctionName === 'anonymous') || (scriptName && scriptName.match("min.js$"))) {
+                                                         if ((calledFunctionName && calledFunctionName === 'anonymous')) {
                                                              return;
                                                          }
 
-                                                         if ((scriptName.indexOf("chrome:") == -1 && scriptName.indexOf("resource:") == -1) && calledFunctionName[0] != '$' && !frame.isDebugger) {
+                                                         if (calledFunctionName[0] != '$' && !frame.isDebugger) {
                                                              switch(type)  { 
                                                              case jsdICallHook.TYPE_TOPLEVEL_END: 
                                                                  
@@ -397,6 +414,12 @@ FBL.ns(function() { with (FBL) {
                                          jsd.appendFilter(this._createFilter("chrome://*"));
                                          jsd.appendFilter(this._createFilter("x-jsd:ppbuffer*"));
                                          jsd.appendFilter(this._createFilter("XPCSafeJSObjectWrapper.cpp"));
+                                         jsd.appendFilter(this._createFilter("resource://*"));
+                                     },
+                                     _addCustomFilters:function(jsd, customFilters) {
+                                         var customFilterCriteria = this._createFilter("*min.js");
+                                         customFilters.push(new FilterWrapper(customFilterCriteria));
+                                         jsd.appendFilter(customFilterCriteria);
                                      },
                                      _createFilter: function(pattern, pass, startLine, endLine) {
                                          var jsdIFilter = Ci.jsdIFilter;
@@ -415,6 +438,9 @@ FBL.ns(function() { with (FBL) {
         {
             simpleMessageTag:
             SPAN({"class":"message"},"Press Stop to see flow"),
+
+            clearMessageTag:
+            SPAN({"class":"message"},""),
 
             noResultTag:
             SPAN({"class":"message"},"No Results to show"),
@@ -506,7 +532,14 @@ FBL.ns(function() { with (FBL) {
         if (this.hasChildren()) {
             return this.children[this.children.length - 1];
         }
-    }
+    };
+
+    function FilterWrapper(filter) {
+        this.jsdIFilter = filter;
+    };
+    FilterWrapper.prototype.toString = function() {
+        return $STRF("fireTrace.filterValue", this.jsdIFilter.urlPattern);
+    };
     Firebug.registerPanel(FFlowPanel);
     Firebug.registerModule(Firebug.FFlowModule);
 
