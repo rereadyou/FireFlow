@@ -466,7 +466,7 @@ FBL.ns(function() { with (FBL) {
                          )
                     ),
                 A({"class":"scriptName scriptLink", _scriptName:"$node.scriptName", _lineNumber:"$node.lineNumber"},"$node.prettyName"), 
-                SPAN({"class":"lineNumber"},"($node.lineNumber)"),
+                SPAN({"class":"lineNumber"},"(line $node.lineNumber)"),
                 SPAN({"class":"scriptCount nodeBox"},"[Invoked $node.invocationCount times]"),
                 DIV({"class":"childList"},
                     FOR("child", "$node.children",
@@ -506,7 +506,7 @@ FBL.ns(function() { with (FBL) {
         this.parent = null;
         this.children = new Array();
         this.childIndicator = "";
-        this.prettyName = scriptName;
+        this.prettyName = this.getPrettyName(scriptName);
     }
 
 
@@ -531,6 +531,15 @@ FBL.ns(function() { with (FBL) {
     FlowNode.prototype.lastChild = function() {
         if (this.hasChildren()) {
             return this.children[this.children.length - 1];
+        }
+    };
+
+    FlowNode.prototype.getPrettyName = function(scriptName) {
+        var index = scriptName.lastIndexOf('/');
+        if (index < scriptName.length) {
+            return scriptName.substring( index + 1);
+        } else {
+            return scriptName;
         }
     };
 
