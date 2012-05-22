@@ -1,0 +1,4 @@
+<!ENTITY start.label "Start">
+<!ENTITY start.tooltip "Starts the tracking process">
+<!ENTITY clear.tooltip "Clears the tracking console">
+<!ENTITY clear.label "Clear">

@@ -1,7 +1,27 @@
 <?xml version="1.0"?> 
-<?xml-stylesheet href="chrome://fireflow/skin/fireflow.css"?>
+<!DOCTYPE window SYSTEM "chrome://fireflow/locale/fireflow.dtd">
 <overlay xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
 
   <script src="chrome://fireflow/content/fireflow.js" type="application/x-javascript"/>
+
+  <commandset id="mainCommandSet">
+    <command id="cmd_ftoggleFlow" oncommand="Firebug.FFlowModule.toggleTrackingPath(Firebug.currentContext)"/>
+    <command id="cmd_fClear" oncommand="Firebug.FFlowModule.clearPanel(Firebug.currentContext)"/>
+  </commandset> 
+
+  <toolbar id="fbToolbar" align="center" >
+    <hbox id="fbToolbarInner" flex="1" align="center">
+      <hbox id="fbFlowButtons" insertafter="fbNetButtons" collapsed="true">
+        <toolbarbutton id="fFlowToggle" label="&start.label;"
+                       class="toolbar-text-button"
+                       tooltiptext="&start.tooltip;"
+                       command="cmd_ftoggleFlow" />
+        <toolbarbutton id="fFlowClear" label="&clear.label;"
+                       class="toolbar-text-button"
+                       tooltiptext="&clear.tooltip;"
+                       command="cmd_fClear" />
+      </hbox>
+    </hbox>
+  </toolbar>
 
 </overlay>

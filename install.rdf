@@ -5,16 +5,17 @@
   <RDF:Description RDF:about="rdf:#$NoTiK"
                    em:id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}"
                    em:minVersion="3.0.*"
-                   em:maxVersion="6.*" />
+                   em:maxVersion="14.*" />
   <RDF:Description RDF:about="urn:mozilla:install-manifest"
                    em:id="fireflow@imaginea.com"
                    em:name="FireFlow"
-                   em:version="0.3.1">
+                   em:version="0.8"
+                   em:unpack="true"
+                   >
     <em:type>2</em:type>
     <em:targetApplication RDF:resource="rdf:#$NoTiK"/>
     <em:description>Javascript trace utility.</em:description>
     <em:creator>Apurba Nath</em:creator>
-    <em:contributor>Eswara Krishna V</em:contributor>
     <em:homepageURL>http://blog.imaginea.com/fireflow/</em:homepageURL>
   </RDF:Description>
   <RDF:Description RDF:about="urn:mozilla:extension:file:"
