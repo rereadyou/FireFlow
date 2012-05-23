@@ -18,7 +18,7 @@ FBL.ns(function() { with (FBL) {
                                       initialize: function(context, doc)
                                       {
                                           Firebug.Panel.initialize.apply(this, arguments);
-                                          appendStylesheet(doc, "rootcss", "chrome://fireflow/skin/fireflow.css");
+                                          appendStylesheet(doc, "chrome://fireflow/skin/fireflow.css");
                                       },
 
                                       show: function(state)
@@ -138,6 +138,7 @@ FBL.ns(function() { with (FBL) {
 									  }
 
                                   });
+
     function FFlowModule() {}
     Firebug.FFlowModule = extend(Firebug.Module,
                                  /** @lends Firebug.FTraceModule */
@@ -287,7 +288,7 @@ FBL.ns(function() { with (FBL) {
                                          if (self.currentNode) {
                                              var lastSibling = self.currentNode.lastChild()
                                              if (lastSibling && calledFunctionName == lastSibling.functionName && scriptName == lastSibling.scriptName) {
-                                                 lastSibling.invocationCount++;
+                                                 lastSibling.increaseInvocationCount();
                                                  lastSibling.ignoreReturnCount++;
                                              } else {
                                                  var childNode = new FlowNode(calledFunctionName, scriptName);
@@ -320,11 +321,14 @@ FBL.ns(function() { with (FBL) {
                                      showTreeInScriptPanel:function(context) {
                                          var panel = context.getPanel("fFlow", true);
                                          var scriptPanel = context.getPanel("fFlowScriptPanel", true);
+                                         this.logMessage(panel.panelNode.innerHTML);
+
                                          try{
                                              if (scriptPanel) {
                                                  scriptPanel.panelNode.innerHTML = panel.panelNode.innerHTML;
                                                  this._decorateTemplate(scriptPanel.panelNode);
                                                  this.logMessage("Passing html content to script panel");
+
                                              } else {
                                                  alert("Please enable the FireFlow panel under Script tab by selecting it and then perform this action again");
                                              }
@@ -477,12 +481,12 @@ FBL.ns(function() { with (FBL) {
             DIV({"class": "nodeBox memberLabel memberRow opened", $hasChildren:"$node.childIndicator"},
                 SPAN({"class":"memberLabelCell"},
                      SPAN({"class":"nodeBox memberLabel treeNode"},
-                          SPAN({"class":"functionName messageNameLabel "}, "$node.functionName()   ")
+                          SPAN({"class":"functionName "}, "$node.functionName()   ")
                          )
                     ),
                 A({"class":"scriptName scriptLink", _scriptName:"$node.scriptName", _lineNumber:"$node.lineNumber"},"$node.prettyName"), 
                 SPAN({"class":"lineNumber"},"(line $node.lineNumber)"),
-                SPAN({"class":"scriptCount nodeBox"},"[Invoked $node.invocationCount times]"),
+                SPAN({"class":"scriptCount nodeBox"},"$node.invocationMessage"),
                 DIV({"class":"childList"},
                     FOR("child", "$node.children",
                         TAG("$graphElement", {node:"$child"})
@@ -517,6 +521,7 @@ FBL.ns(function() { with (FBL) {
         this.scriptName = scriptName;
         this.lineNumber = 0;
         this.invocationCount = 1;
+        this.invocationMessage = "";
         this.ignoreReturnCount = 0;
         this.parent = null;
         this.children = new Array();
@@ -524,7 +529,10 @@ FBL.ns(function() { with (FBL) {
         this.prettyName = this.getPrettyName(scriptName);
     }
 
-
+    FlowNode.prototype.increaseInvocationCount = function() {
+        this.invocationCount++;
+        this.invocationMessage = "[Invoked "+this.invocationCount+" times ]";
+    };
     FlowNode.prototype.addChild = function(node) {
         this.children.push(node);
         node.setParent(this);

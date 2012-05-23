@@ -1,9 +1,13 @@
-.functionName .scriptName {
+.functionName {
+    font-family: Lucida Grande, sans-serif;
+    white-space: pre-wrap;
+}
+
+.scriptName, .lineNumber {
     font-family: Lucida Grande, sans-serif;
     font-weight: bold;
-    color: DarkGreen;
+    color: blue;
     white-space: pre-wrap;
-    /* padding-right: 15px; */
 }
 
 .objectPropValue {
